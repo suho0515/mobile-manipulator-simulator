@@ -1,0 +1,654 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+
+
+
+
+
+
+
+
+  <!-- The gazebo_ros_laser plugin does the following:
+       - If the ROS parameter 'tf_prefix' is set, it prepends the
+       - tf_prefix in front of the frameName.
+       - Otherwise, it prepends the robotNamespace.
+
+       The robotNamespace gets automatically set if you start the
+       spawn_model node inside a namespace. In this case, set
+       prepend_prefix_to_laser_frame to 'false', otherwise the
+       resulting frameName will have two prefixes prepended.
+
+       If you don't start spawn_model inside a namespace but have a
+       non-empty prefix, set prepend_prefix_to_laser_frame to 'true'. -->
+  <xacro:arg name="prepend_prefix_to_laser_frame" default="false" />
+
+  <xacro:include filename="$(find mir_description)/urdf/include/common_properties.urdf.xacro" />
+  <xacro:include filename="$(find mir_description)/urdf/include/imu.gazebo.urdf.xacro" />
+  <xacro:include filename="$(find mir_description)/urdf/include/mir_100.gazebo.xacro" />
+  <xacro:include filename="$(find mir_description)/urdf/include/mir_100.transmission.xacro" />
+  <xacro:include filename="$(find mir_description)/urdf/include/sick_s300.urdf.xacro" />
+
+  <xacro:property name="deg_to_rad" value="0.017453293" />
+
+  <xacro:property name="mir_100_base_mass" value="58.0" />
+
+  <xacro:property name="mir_100_act_wheel_radius" value="0.0625" />
+  <xacro:property name="mir_100_act_wheel_width" value="0.032" />
+  <xacro:property name="mir_100_act_wheel_mass" value="1.0" />
+  <xacro:property name="mir_100_act_wheel_dx" value="0.037646" />
+  <xacro:property name="mir_100_act_wheel_dy" value="0.222604" />
+
+  <xacro:property name="mir_100_caster_wheel_radius" value="${mir_100_act_wheel_radius}" />
+  <xacro:property name="mir_100_caster_wheel_width" value="${mir_100_act_wheel_width}" />
+  <xacro:property name="mir_100_caster_wheel_mass" value="${mir_100_act_wheel_mass}" />
+  <xacro:property name="mir_100_caster_wheel_dx" value="-0.0382" />
+  <xacro:property name="mir_100_caster_wheel_dy" value="0" />
+  <xacro:property name="mir_100_caster_wheel_dz" value="-0.094" />
+  <xacro:property name="mir_100_front_caster_wheel_base_dx" value="0.341346" />
+  <xacro:property name="mir_100_back_caster_wheel_base_dx" value="-0.270154" />
+  <xacro:property name="mir_100_caster_wheel_base_dy" value="0.203" />
+  <xacro:property name="mir_100_caster_wheel_base_dz" value="${mir_100_caster_wheel_radius-mir_100_caster_wheel_dz}" />
+
+  <xacro:property name="imu_stdev" value="0.00017" />
+
+  <xacro:macro name="actuated_wheel" params="prefix locationprefix locationright">
+    <joint name="${prefix}${locationprefix}_wheel_joint" type="continuous">
+      <origin xyz="0.0 ${-mir_100_act_wheel_dy * locationright} ${mir_100_act_wheel_radius}" rpy="0 0 0" />
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}${locationprefix}_wheel_link" />
+      <axis xyz="0 1 0" />
+      <limit effort="100" velocity="20.0" />
+    </joint>
+
+    <link name="${prefix}${locationprefix}_wheel_link">
+      <xacro:cylinder_inertial mass="${mir_100_act_wheel_mass}" radius="${mir_100_act_wheel_radius}" length="${mir_100_act_wheel_width}">
+        <origin xyz="0 0 0" rpy="${0.5 * pi} 0 0" />
+      </xacro:cylinder_inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/visual/wheel.stl" />
+        </geometry>
+        <xacro:insert_block name="material_dark_grey" />
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/visual/wheel.stl" />
+        </geometry>
+      </collision>
+    </link>
+    <gazebo reference="${prefix}${locationprefix}_wheel_link">
+      <material>Gazebo/DarkGrey</material>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:macro name="caster_wheel" params="prefix locationprefix locationright wheel_base_dx">
+    <!-- caster hub -->
+    <joint name="${prefix}${locationprefix}_caster_rotation_joint" type="continuous">
+      <origin xyz="${wheel_base_dx} ${-mir_100_caster_wheel_base_dy * locationright} ${mir_100_caster_wheel_base_dz}" rpy="0 0 0" />
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}${locationprefix}_caster_rotation_link" />
+      <axis xyz="0 0 1" />
+      <dynamics damping="0.01" friction="0.0"/>
+    </joint>
+
+    <link name="${prefix}${locationprefix}_caster_rotation_link">
+      <inertial>
+        <!-- <origin xyz="0 0 -0.042500000044" rpy="${0.5 * pi} ${24 * deg_to_rad} ${1.5 * pi}" /> -->
+        <origin xyz="0 0 -0.042500000044" rpy="${24 * deg_to_rad} 0 ${0.5 * pi} " />
+        <mass value="0.3097539019" />
+        <inertia
+          ixx="0.0005844517978"
+          ixy="0"
+          ixz="0"
+          iyy="0.00052872551237"
+          iyz="0"
+          izz="0.00017923555074" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/visual/caster_wheel_base.stl" />
+        </geometry>
+        <xacro:insert_block name="material_silver" />
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/collision/caster_wheel_base.stl" />
+        </geometry>
+      </collision>
+    </link>
+    <gazebo reference="${prefix}${locationprefix}_caster_rotation_link">
+      <material>Gazebo/Grey</material>
+    </gazebo>
+
+    <!-- caster wheel -->
+    <joint name="${prefix}${locationprefix}_caster_wheel_joint" type="continuous">
+      <origin xyz="${mir_100_caster_wheel_dx} ${-mir_100_caster_wheel_dy * locationright} ${mir_100_caster_wheel_dz}" rpy="0 0 0" />
+      <parent link="${prefix}${locationprefix}_caster_rotation_link" />
+      <child link="${prefix}${locationprefix}_caster_wheel_link" />
+      <axis xyz="0 1 0" />
+    </joint>
+
+    <link name="${prefix}${locationprefix}_caster_wheel_link">
+      <xacro:cylinder_inertial mass="${mir_100_caster_wheel_mass}" radius="${mir_100_caster_wheel_radius}" length="${mir_100_caster_wheel_width}">
+        <origin xyz="0 0 0" rpy="${0.5 * pi} 0 0" />
+      </xacro:cylinder_inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/visual/wheel.stl" />
+        </geometry>
+        <xacro:insert_block name="material_dark_grey" />
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/visual/wheel.stl" />
+        </geometry>
+      </collision>
+    </link>
+    <gazebo reference="${prefix}${locationprefix}_caster_wheel_link">
+      <material>Gazebo/DarkGrey</material>
+    </gazebo>
+  </xacro:macro>
+
+
+
+
+
+
+
+
+
+
+  <xacro:include filename="$(find ur_e_description)/urdf/ur.transmission.xacro" />
+  <xacro:include filename="$(find ur_e_description)/urdf/ur.gazebo.xacro" />
+
+   <xacro:macro name="cylinder_inertial" params="radius length mass *origin">
+    <inertial>
+      <mass value="${mass}" />
+      <xacro:insert_block name="origin" />
+      <inertia ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0"
+        iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0"
+        izz="${0.5 * mass * radius * radius}" />
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="mobile_manipulator" params="prefix joint_limited
+    shoulder_pan_lower_limit:=${-pi}    shoulder_pan_upper_limit:=${pi}
+    shoulder_lift_lower_limit:=${-pi}    shoulder_lift_upper_limit:=${pi}
+    elbow_joint_lower_limit:=${-pi}    elbow_joint_upper_limit:=${pi}
+    wrist_1_lower_limit:=${-pi}    wrist_1_upper_limit:=${pi}
+    wrist_2_lower_limit:=${-pi}    wrist_2_upper_limit:=${pi}
+    wrist_3_lower_limit:=${-pi}    wrist_3_upper_limit:=${pi}
+    transmission_hw_interface:=hardware_interface/PositionJointInterface
+    safety_limits:=false safety_pos_margin:=0.15
+    safety_k_position:=20">
+
+    <link name="${prefix}base_footprint" />
+
+    <joint name="${prefix}base_joint" type="fixed">
+      <parent link="${prefix}base_footprint" />
+      <child link="${prefix}base_link" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+    </joint>
+
+    <link name="${prefix}base_link">
+      <xacro:box_inertial mass="${mir_100_base_mass}" x="0.9" y="0.58" z="0.3">
+        <origin xyz="${mir_100_act_wheel_dx} 0 0.20" rpy="0 0 0" />
+      </xacro:box_inertial>
+      <visual>
+        <origin xyz="${mir_100_act_wheel_dx} 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/visual/mir_100_base.stl" />
+        </geometry>
+        <xacro:insert_block name="material_white" />
+      </visual>
+      <collision>
+        <origin xyz="${mir_100_act_wheel_dx} 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://mir_description/meshes/collision/mir_100_base.stl" />
+        </geometry>
+      </collision>
+    </link>
+    <gazebo reference="${prefix}base_link">
+      <material>Gazebo/White</material>
+    </gazebo>
+
+    <!-- IMU -->
+    <joint name="${prefix}base_link_to_imu_joint" type="fixed">
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}imu_link" />
+      <origin xyz="0.0 0.0 0.25" rpy="0 0 0" />  <!-- same as real MiR -->
+    </joint>
+
+    <link name="${prefix}imu_link" />
+
+    <xacro:imu_gazebo link="${prefix}imu_link" imu_topic="imu_data" update_rate="50.0" stdev="${imu_stdev}" />
+
+    <!-- Create an alias for imu_link. This is necessary because the real MiR's
+         TF has imu_link, but the imu_data topic is published in the imu_frame
+         frame. -->
+    <joint name="${prefix}imu_link_to_imu_frame_joint" type="fixed">
+      <parent link="${prefix}imu_link" />
+      <child link="${prefix}imu_frame" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+    </joint>
+
+    <link name="${prefix}imu_frame" />
+
+    <!-- Laser scanners -->
+    <joint name="${prefix}base_link_to_front_laser_joint" type="fixed">
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}front_laser_link" />
+      <origin xyz="0.4288 0.2358 0.1914" rpy="0.0 0.0 ${0.25 * pi}" />  <!-- from visually matching up the meshes of the MiR and the laser scanner -->
+    </joint>
+    <xacro:sick_s300 prefix="${prefix}" link="front_laser_link" topic="f_scan"
+                     prepend_prefix_to_laser_frame="$(arg prepend_prefix_to_laser_frame)" />
+
+    <joint name="${prefix}base_link_to_back_laser_joint" type="fixed">
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}back_laser_link" />
+      <origin xyz="-0.3548 -0.2352 0.1914" rpy="0.0 0.0 ${-0.75 * pi}" />  <!-- from visually matching up the meshes of the MiR and the laser scanner -->
+    </joint>
+
+    <xacro:sick_s300 prefix="${prefix}" link="back_laser_link" topic="b_scan"
+                     prepend_prefix_to_laser_frame="$(arg prepend_prefix_to_laser_frame)" />
+
+    <!-- Ultrasound sensors -->
+    <joint name="${prefix}us_1_joint" type="fixed">   <!-- right ultrasound -->
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}us_1_frame" />
+      <origin xyz="0.45 -0.12 0.16 " rpy="0 0 0" />  <!-- from visually matching to the mesh of the MiR -->
+    </joint>
+
+    <link name="${prefix}us_1_frame" />
+
+    <joint name="${prefix}us_2_joint" type="fixed">   <!-- left ultrasound -->
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}us_2_frame" />
+      <origin xyz="0.45 0.12 0.16 " rpy="0 0 0" />  <!-- from visually matching to the mesh of the MiR -->
+    </joint>
+
+    <link name="${prefix}us_2_frame" />
+
+    <!-- wheels -->
+    <xacro:actuated_wheel prefix="${prefix}" locationprefix="left" locationright="-1"/>
+    <xacro:actuated_wheel prefix="${prefix}" locationprefix="right" locationright="1"/>
+    <xacro:caster_wheel prefix="${prefix}" locationprefix="fl" locationright="-1" wheel_base_dx="${mir_100_front_caster_wheel_base_dx}"/>
+    <xacro:caster_wheel prefix="${prefix}" locationprefix="fr" locationright="1" wheel_base_dx="${mir_100_front_caster_wheel_base_dx}"/>
+    <xacro:caster_wheel prefix="${prefix}" locationprefix="bl" locationright="-1" wheel_base_dx="${mir_100_back_caster_wheel_base_dx}"/>
+    <xacro:caster_wheel prefix="${prefix}" locationprefix="br" locationright="1" wheel_base_dx="${mir_100_back_caster_wheel_base_dx}"/>
+
+    <joint name="${prefix}base_link_surface_joint" type="fixed">
+      <origin xyz="${mir_100_act_wheel_dx} 0 0.352" rpy="0 0 0" />
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}surface" />
+      <axis xyz="0 0 1" />
+    </joint>
+
+    <link name="${prefix}surface"/>
+
+    <xacro:mir_100_wheel_transmissions prefix="${prefix}"/>
+
+    <!-- set the gazebo friction parameters for the wheels -->
+    <xacro:set_all_wheel_frictions prefix="${prefix}"/>
+
+    <xacro:p3d_base_controller prefix="${prefix}" />
+
+
+
+
+    <!-- UR related from this line. -->
+    <joint name="${prefix}mir_to_ur" type="fixed">
+      <parent link="${prefix}base_link" />
+      <child link="${prefix}ur_base_link" />
+      <origin xyz="0 0 0.75" rpy="0 0 0" />
+    </joint>
+
+
+
+
+
+    <!-- Inertia parameters -->
+    <xacro:property name="base_mass" value="2.0" />  <!-- This mass might be incorrect -->
+    <xacro:property name="shoulder_mass" value="2.0" />
+    <xacro:property name="upper_arm_mass" value="3.42" />
+    <xacro:property name="forearm_mass" value="1.26" />
+    <xacro:property name="wrist_1_mass" value="0.8" />
+    <xacro:property name="wrist_2_mass" value="0.8" />
+    <xacro:property name="wrist_3_mass" value="0.35" />
+
+    <!-- These parameters are borrowed from the urcontrol.conf file
+        but are not verified for the correct permutation.
+        The permutation was guessed by looking at the ur5e parameters.
+        Serious use of these parameters needs further inspection. -->
+    <xacro:property name="shoulder_cog" value="0.0 -0.02 0.0" />
+    <xacro:property name="upper_arm_cog" value="0.13 0.0 0.1157" />
+    <xacro:property name="forearm_cog" value="0.05 0.0 0.0238" />
+    <xacro:property name="wrist_1_cog" value="0.0 0.0 0.01" />
+    <xacro:property name="wrist_2_cog" value="0.0 0.0 0.01" />
+    <xacro:property name="wrist_3_cog" value="0.0 0.0 -0.02" />
+
+    <!-- Kinematic model -->
+    <!-- Properties from urcontrol.conf -->
+    <xacro:property name="d1" value="0.152" />
+    <xacro:property name="a2" value="-0.244" />
+    <xacro:property name="a3" value="-0.213" />
+    <xacro:property name="d4" value="0.104" />
+    <xacro:property name="d5" value="0.085" />
+    <xacro:property name="d6" value="0.092" />
+
+    <!-- Arbitrary offsets for shoulder/elbow joints -->
+    <xacro:property name="shoulder_offset" value="0.120" />  <!-- measured from model -->
+    <xacro:property name="elbow_offset" value="-0.093" /> <!-- measured from model -->
+
+    <!-- link lengths used in model -->
+    <xacro:property name="shoulder_height" value="${d1}" />
+    <xacro:property name="upper_arm_length" value="${-a2}" />
+    <xacro:property name="forearm_length" value="${-a3}" />
+    <xacro:property name="wrist_1_length" value="${d4}" />
+    <xacro:property name="wrist_2_length" value="${d5}" />
+    <xacro:property name="wrist_3_length" value="${d6}" />
+
+    <link name="${prefix}ur_base_link" >
+      <visual>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/visual/base.dae"/>
+        </geometry>
+        <material name="LightGrey">
+          <color rgba="0.7 0.7 0.7 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/collision/base.stl"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertial radius="0.075" length="0.038" mass="${base_mass}">
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+      </xacro:cylinder_inertial>
+    </link>
+
+    <joint name="${prefix}shoulder_pan_joint" type="revolute">
+      <parent link="${prefix}ur_base_link" />
+      <child link = "${prefix}shoulder_link" />
+      <origin xyz="0.0 0.0 ${shoulder_height}" rpy="0.0 0.0 0.0" />
+      <axis xyz="0 0 1" />
+      <xacro:unless value="${joint_limited}">
+        <limit lower="${-2.0 * pi}" upper="${2.0 * pi}" effort="330.0" velocity="3.14"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${-2.0 * pi + safety_pos_margin}" soft_upper_limit="${2.0 * pi - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:unless>
+      <xacro:if value="${joint_limited}">
+        <limit lower="${shoulder_pan_lower_limit}" upper="${shoulder_pan_upper_limit}" effort="330.0" velocity="3.14"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${shoulder_pan_lower_limit + safety_pos_margin}" soft_upper_limit="${shoulder_pan_upper_limit - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:if>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="${prefix}shoulder_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/visual/shoulder.dae"/>
+        </geometry>
+        <material name="LightGrey">
+          <color rgba="0.7 0.7 0.7 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/collision/shoulder.stl"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertial radius="0.075" length="0.178" mass="${shoulder_mass}">
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+      </xacro:cylinder_inertial>
+    </link>
+
+    <joint name="${prefix}shoulder_lift_joint" type="revolute">
+      <parent link="${prefix}shoulder_link" />
+      <child link = "${prefix}upper_arm_link" />
+      <origin xyz="0.0 ${shoulder_offset} 0.0" rpy="0.0 ${pi / 2.0} 0.0" />
+      <axis xyz="0 1 0" />
+      <xacro:unless value="${joint_limited}">
+        <limit lower="${-2.0 * pi}" upper="${2.0 * pi}" effort="330.0" velocity="3.14"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${-2.0 * pi + safety_pos_margin}" soft_upper_limit="${2.0 * pi - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:unless>
+      <xacro:if value="${joint_limited}">
+        <limit lower="${shoulder_lift_lower_limit}" upper="${shoulder_lift_upper_limit}" effort="330.0" velocity="3.14"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${shoulder_lift_lower_limit + safety_pos_margin}" soft_upper_limit="${shoulder_lift_upper_limit - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if> 
+      </xacro:if>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="${prefix}upper_arm_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/visual/upperarm.dae"/>
+        </geometry>
+        <material name="LightGrey">
+          <color rgba="0.7 0.7 0.7 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/collision/upperarm.stl"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertial radius="0.075" length="${-a2}" mass="${upper_arm_mass}">
+        <origin xyz="0.0 0.0 ${-a2/2.0}" rpy="0 0 0" />
+      </xacro:cylinder_inertial>
+    </link>
+
+    <joint name="${prefix}elbow_joint" type="revolute">
+      <parent link="${prefix}upper_arm_link" />
+      <child link = "${prefix}forearm_link" />
+      <origin xyz="0.0 ${elbow_offset} ${upper_arm_length}" rpy="0.0 0.0 0.0" />
+      <axis xyz="0 1 0" />
+      <xacro:unless value="${joint_limited}">
+        <limit lower="${-pi}" upper="${pi}" effort="150.0" velocity="3.14"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${-2.0 * pi + safety_pos_margin}" soft_upper_limit="${2.0 * pi - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:unless>
+      <xacro:if value="${joint_limited}">
+        <limit lower="${elbow_joint_lower_limit}" upper="${elbow_joint_upper_limit}" effort="150.0" velocity="3.14"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${elbow_joint_lower_limit + safety_pos_margin}" soft_upper_limit="${elbow_joint_upper_limit - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:if>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="${prefix}forearm_link">
+      <visual>
+         <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/visual/forearm.dae"/>
+        </geometry>
+        <material name="LightGrey">
+          <color rgba="0.7 0.7 0.7 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/collision/forearm.stl"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertial radius="0.075" length="${-a3}" mass="${forearm_mass}">
+        <origin xyz="0.0 0.0 ${-a3/2.0}" rpy="0 0 0" />
+      </xacro:cylinder_inertial>
+    </link>
+
+    <joint name="${prefix}wrist_1_joint" type="revolute">
+      <parent link="${prefix}forearm_link" />
+      <child link = "${prefix}wrist_1_link" />
+      <origin xyz="0.0 0.0 ${forearm_length}" rpy="0.0 ${pi / 2.0} 0.0" />
+      <axis xyz="0 1 0" />
+      <xacro:unless value="${joint_limited}">
+        <limit lower="${-2.0 * pi}" upper="${2.0 * pi}" effort="54.0" velocity="6.28"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${-2.0 * pi + safety_pos_margin}" soft_upper_limit="${2.0 * pi - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:unless>
+      <xacro:if value="${joint_limited}">
+        <limit lower="${wrist_1_lower_limit}" upper="${wrist_1_upper_limit}" effort="54.0" velocity="6.28"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${wrist_1_lower_limit + safety_pos_margin}" soft_upper_limit="${wrist_1_upper_limit - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:if>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="${prefix}wrist_1_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/visual/wrist1.dae"/>
+        </geometry>
+        <material name="LightGrey">
+          <color rgba="0.7 0.7 0.7 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/collision/wrist1.stl"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertial radius="0.075" length="0.12" mass="${wrist_1_mass}">
+        <origin xyz="0.0 ${wrist_1_length} 0.0" rpy="0 0 0" />
+      </xacro:cylinder_inertial>
+    </link>
+
+    <joint name="${prefix}wrist_2_joint" type="revolute">
+      <parent link="${prefix}wrist_1_link" />
+      <child link = "${prefix}wrist_2_link" />
+      <origin xyz="0.0 ${wrist_1_length} 0.0" rpy="0.0 0.0 0.0" />
+      <axis xyz="0 0 1" />
+      <xacro:unless value="${joint_limited}">
+        <limit lower="${-2.0 * pi}" upper="${2.0 * pi}" effort="54.0" velocity="6.28"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${-2.0 * pi + safety_pos_margin}" soft_upper_limit="${2.0 * pi - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:unless>
+      <xacro:if value="${joint_limited}">
+        <limit lower="${wrist_2_lower_limit}" upper="${wrist_2_upper_limit}" effort="54.0" velocity="6.28"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${wrist_2_lower_limit + safety_pos_margin}" soft_upper_limit="${wrist_2_upper_limit - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:if>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="${prefix}wrist_2_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/visual/wrist2.dae"/>
+        </geometry>
+        <material name="LightGrey">
+          <color rgba="0.7 0.7 0.7 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/collision/wrist2.stl"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertial radius="0.075" length="0.12" mass="${wrist_2_mass}">
+        <origin xyz="0.0 0.0 ${wrist_2_length}" rpy="0 0 0" />
+      </xacro:cylinder_inertial>
+    </link>
+
+    <joint name="${prefix}wrist_3_joint" type="revolute">
+      <parent link="${prefix}wrist_2_link" />
+      <child link = "${prefix}wrist_3_link" />
+      <origin xyz="0.0 0.0 ${wrist_2_length}" rpy="0.0 0.0 0.0" />
+      <axis xyz="0 1 0" />
+      <xacro:unless value="${joint_limited}">
+        <limit lower="${-2.0 * pi}" upper="${2.0 * pi}" effort="54.0" velocity="6.28"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${-2.0 * pi + safety_pos_margin}" soft_upper_limit="${2.0 * pi - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:unless>
+      <xacro:if value="${joint_limited}">
+        <limit lower="${wrist_3_lower_limit}" upper="${wrist_3_upper_limit}" effort="54.0" velocity="6.28"/>
+        <xacro:if value="${safety_limits}">
+          <safety_controller soft_lower_limit="${wrist_3_lower_limit + safety_pos_margin}" soft_upper_limit="${wrist_3_upper_limit - safety_pos_margin}" k_position="${safety_k_position}" k_velocity="0.0"/>
+        </xacro:if>
+      </xacro:if>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <link name="${prefix}wrist_3_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/visual/wrist3.dae"/>
+        </geometry>
+        <material name="LightGrey">
+          <color rgba="0.7 0.7 0.7 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://ur_e_description/meshes/ur3e/collision/wrist3.stl"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertial radius="0.032" length="0.042" mass="${wrist_3_mass}">
+        <origin xyz="0.0 ${wrist_3_length - 0.021} 0.0" rpy="${pi/2} 0 0" />
+      </xacro:cylinder_inertial>
+    </link>
+
+    <joint name="${prefix}ee_fixed_joint" type="fixed">
+      <parent link="${prefix}wrist_3_link" />
+      <child link = "${prefix}ee_link" />
+      <origin xyz="0.0 ${wrist_3_length} 0.0" rpy="0.0 0.0 ${pi/2.0}" />
+    </joint>
+
+    <link name="${prefix}ee_link">
+      <collision>
+        <geometry>
+          <box size="0.01 0.01 0.01"/>
+        </geometry>
+        <origin rpy="0 0 0" xyz="-0.01 0 0"/>
+      </collision>
+    </link>
+
+    <xacro:ur_arm_transmission prefix="${prefix}" />
+    <xacro:ur_arm_gazebo prefix="${prefix}" />
+
+    <!-- ROS base_link to UR 'Base' Coordinates transform -->
+    <link name="${prefix}base"/>
+    <joint name="${prefix}base_link-base_fixed_joint" type="fixed">
+      <!-- NOTE: this rotation is only needed as long as base_link itself is
+                 not corrected wrt the real robot (ie: rotated over 180
+                 degrees)
+      -->
+      <origin xyz="0 0 0" rpy="0 0 ${-pi}"/>
+      <parent link="${prefix}ur_base_link"/>
+      <child link="${prefix}base"/>
+    </joint>
+
+    <!-- Frame coincident with all-zeros TCP on UR controller -->
+    <link name="${prefix}tool0"/>
+    <joint name="${prefix}wrist_3_link-tool0_fixed_joint" type="fixed">
+      <origin xyz="0 ${wrist_3_length} 0" rpy="${pi/-2.0} 0 0"/>
+      <parent link="${prefix}wrist_3_link"/>
+      <child link="${prefix}tool0"/>
+    </joint>
+
+  </xacro:macro>
+
+
+
+  
+</robot>

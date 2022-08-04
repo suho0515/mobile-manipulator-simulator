@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<launch>
+  <!-- mir arguments -->
+  <arg name="tf_prefix" default="" doc="TF prefix to use for all of Mobipick's TF frames"/>
+  <arg name="prepend_prefix_to_laser_frame" default="false" doc="Set this to 'true' if you don't start the spawn_model node inside a namespace."/>
+  
+  <!-- ur arguments -->
+  <arg name="limited" default="false" doc="If true, limits joint range [-PI, PI] on all joints." />
+
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find mobile_manipulator_description)/urdf/mobile_manipulator.urdf.xacro tf_prefix:=$(arg tf_prefix) prepend_prefix_to_laser_frame:=$(arg prepend_prefix_to_laser_frame)" />
+</launch>
